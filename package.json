@@ -1,0 +1,13 @@
+{
+  "name": "tai-xiu-analyzer",
+  "version": "1.0.0",
+  "description": "Thuật toán phân tích tài xỉu siêu cấp - Không random",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
+}
