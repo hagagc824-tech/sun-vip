@@ -1,9 +1,15 @@
+import fetch from 'node-fetch';
+import http from 'http';
+
 // ================================================================
-// THUẬT TOÁN PHÂN TÍCH TÀI XỈU SIÊU CẤP - FULL VERSION
-// BẢN QUYỀN @tranhoang2286
+// THUẬT TOÁN PHÂN TÍCH TÀI XỈU - BẢN CHO RENDER
 // ================================================================
 
-// ===== CẤP ĐỘ 1: BỘ NHẬN DIỆN CẦU CƠ BẢN =====
+const PORT = process.env.PORT || 3000;
+const AUTHOR_ID = "@tranhoang2286";
+const API_URL = "https://apisunwinhistory.onrender.com/api/tx";
+
+// ===== CÁC CLASS PHÂN TÍCH (GIỮ NGUYÊN) =====
 class BasePatternDetector {
   detectBetStreak(results) {
     let streak = 1;
@@ -152,7 +158,7 @@ class BasePatternDetector {
   }
 }
 
-// ===== CẤP ĐỘ 2: BỘ PHÂN TÍCH NÂNG CAO =====
+// ===== PHÂN TÍCH NÂNG CAO =====
 class AdvancedAnalyzer {
   analyzeRatio(results) {
     if (results.length < 15) return null;
@@ -317,8 +323,6 @@ class AdvancedAnalyzer {
     let values = results.map(r => r === 'Tài' ? 1 : 0);
     let high = Math.max(...values);
     let low = Math.min(...values);
-    let range = high - low;
-    let fibLevels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
     let current = values[values.length - 1];
     let prediction = current === 1 ? 'Xỉu' : 'Tài';
     return { pred: prediction, conf: 72, name: 'FIB_RETRACEMENT' };
@@ -367,381 +371,12 @@ class AdvancedAnalyzer {
   }
 }
 
-// ===== CẤP ĐỘ 3: BỘ HỌC THÔNG MINH =====
-class SmartLearner {
-  constructor() {
-    this.patternMemory = new Map();
-    this.sequenceMemory = new Map();
-    this.frequencyMemory = new Map();
-    this.complexPatterns = new Map();
-    this.weights = new Map();
-    this.decisionTree = new Map();
-  }
-  
-  predictFromPattern(results) {
-    for (let len = 7; len >= 3; len--) {
-      if (results.length >= len) {
-        let pattern = results.slice(0, len).join('');
-        if (this.patternMemory.has(pattern)) {
-          let p = this.patternMemory.get(pattern);
-          if (p.total >= 2) {
-            let taiProb = p.Tai / p.total;
-            let successRate = p.correct / p.total;
-            let prediction = taiProb > 0.5 ? 'Tài' : 'Xỉu';
-            let confidence = 55 + Math.abs(taiProb - 0.5) * 45;
-            if (successRate > 0.65) confidence += 5;
-            if (successRate > 0.8) confidence += 8;
-            return { pred: prediction, conf: Math.min(92, confidence), name: `LEARNED_${len}` };
-          }
-        }
-      }
-    }
-    return null;
-  }
-  
-  predictFromSequence(results) {
-    for (let len = 4; len >= 2; len--) {
-      if (results.length >= len) {
-        let seq = results.slice(0, len).join('');
-        if (this.sequenceMemory.has(seq)) {
-          let s = this.sequenceMemory.get(seq);
-          if (s.total >= 3) {
-            let taiProb = s.Tai / s.total;
-            let prediction = taiProb > 0.5 ? 'Tài' : 'Xỉu';
-            let confidence = 55 + Math.abs(taiProb - 0.5) * 45;
-            return { pred: prediction, conf: Math.min(88, confidence), name: `SEQ_${len}` };
-          }
-        }
-      }
-    }
-    return null;
-  }
-  
-  predictFromFrequency(results) {
-    if (results.length < 5) return null;
-    let key = results.slice(0, 5).join('');
-    if (this.frequencyMemory.has(key)) {
-      let f = this.frequencyMemory.get(key);
-      if (f.total >= 2) {
-        let taiProb = f.Tai / f.total;
-        let prediction = taiProb > 0.5 ? 'Tài' : 'Xỉu';
-        let confidence = 50 + Math.abs(taiProb - 0.5) * 50;
-        return { pred: prediction, conf: Math.min(85, confidence), name: 'FREQ' };
-      }
-    }
-    return null;
-  }
-  
-  predictComplexPattern(results) {
-    if (results.length < 6) return null;
-    for (let len = 6; len >= 4; len--) {
-      if (results.length >= len) {
-        let pattern = results.slice(0, len).join('');
-        for (let [key, value] of this.complexPatterns) {
-          if (key.length === pattern.length) {
-            let match = 0;
-            for (let i = 0; i < pattern.length; i++) {
-              if (pattern[i] === key[i]) match++;
-            }
-            if (match >= len - 1 && value.total >= 2) {
-              let taiProb = value.Tai / value.total;
-              let prediction = taiProb > 0.5 ? 'Tài' : 'Xỉu';
-              return { pred: prediction, conf: 70, name: 'COMPLEX' };
-            }
-          }
-        }
-      }
-    }
-    return null;
-  }
-  
-  predictFromDecisionTree(results) {
-    if (results.length < 5) return null;
-    let features = this.extractFeatures(results);
-    let bestMatch = null;
-    let bestScore = 0;
-    for (let [key, value] of this.decisionTree) {
-      let score = this.matchFeatures(features, key);
-      if (score > bestScore && value.total >= 2) {
-        bestScore = score;
-        bestMatch = value;
-      }
-    }
-    if (bestMatch && bestScore > 0.7) {
-      let taiProb = bestMatch.Tai / bestMatch.total;
-      let prediction = taiProb > 0.5 ? 'Tài' : 'Xỉu';
-      return { pred: prediction, conf: 70 + bestScore * 20, name: 'DECISION_TREE' };
-    }
-    return null;
-  }
-  
-  extractFeatures(results) {
-    let features = [];
-    let last = results[0];
-    for (let i = 1; i < Math.min(10, results.length); i++) {
-      if (results[i] === last) features.push(1);
-      else features.push(0);
-      last = results[i];
-    }
-    return features.join('');
-  }
-  
-  matchFeatures(features, key) {
-    let match = 0;
-    for (let i = 0; i < Math.min(features.length, key.length); i++) {
-      if (features[i] === key[i]) match++;
-    }
-    return match / Math.min(features.length, key.length);
-  }
-  
-  learnFromPattern(results, outcome, wasCorrect) {
-    for (let len = 3; len <= 8; len++) {
-      if (results.length >= len) {
-        let pattern = results.slice(0, len).join('');
-        if (!this.patternMemory.has(pattern)) {
-          this.patternMemory.set(pattern, { Tai: 0, Xiu: 0, total: 0, correct: 0 });
-        }
-        let p = this.patternMemory.get(pattern);
-        if (outcome === 'Tài') p.Tai++;
-        else p.Xiu++;
-        p.total++;
-        if (wasCorrect) p.correct++;
-      }
-    }
-  }
-  
-  learnFromSequence(results, outcome) {
-    for (let len = 2; len <= 5; len++) {
-      if (results.length >= len) {
-        let seq = results.slice(0, len).join('');
-        if (!this.sequenceMemory.has(seq)) {
-          this.sequenceMemory.set(seq, { Tai: 0, Xiu: 0, total: 0 });
-        }
-        let s = this.sequenceMemory.get(seq);
-        if (outcome === 'Tài') s.Tai++;
-        else s.Xiu++;
-        s.total++;
-      }
-    }
-  }
-  
-  learnFromFrequency(results, outcome) {
-    if (results.length >= 5) {
-      let key = results.slice(0, 5).join('');
-      if (!this.frequencyMemory.has(key)) {
-        this.frequencyMemory.set(key, { Tai: 0, Xiu: 0, total: 0 });
-      }
-      let f = this.frequencyMemory.get(key);
-      if (outcome === 'Tài') f.Tai++;
-      else f.Xiu++;
-      f.total++;
-    }
-  }
-  
-  learnComplexPattern(results, outcome) {
-    if (results.length >= 4) {
-      for (let len = 4; len <= 6; len++) {
-        if (results.length >= len) {
-          let pattern = results.slice(0, len).join('');
-          if (!this.complexPatterns.has(pattern)) {
-            this.complexPatterns.set(pattern, { Tai: 0, Xiu: 0, total: 0 });
-          }
-          let c = this.complexPatterns.get(pattern);
-          if (outcome === 'Tài') c.Tai++;
-          else c.Xiu++;
-          c.total++;
-        }
-      }
-    }
-  }
-  
-  learnDecisionTree(results, outcome) {
-    if (results.length >= 5) {
-      let features = this.extractFeatures(results);
-      if (!this.decisionTree.has(features)) {
-        this.decisionTree.set(features, { Tai: 0, Xiu: 0, total: 0 });
-      }
-      let d = this.decisionTree.get(features);
-      if (outcome === 'Tài') d.Tai++;
-      else d.Xiu++;
-      d.total++;
-    }
-  }
-}
-
-// ===== CẤP ĐỘ 4: BỘ DỰ BÁO THỜI GIAN =====
-class TemporalAnalyzer {
-  constructor() {
-    this.hourlyData = new Array(24).fill().map(() => ({ Tai: 0, Xiu: 0, total: 0 }));
-    this.dailyData = new Array(7).fill().map(() => ({ Tai: 0, Xiu: 0, total: 0 }));
-    this.weeklyData = new Map();
-    this.monthlyData = new Map();
-    this.quarterlyData = new Map();
-    this.yearlyData = new Map();
-  }
-  
-  analyzeHourly() {
-    let hour = new Date().getHours();
-    let data = this.hourlyData[hour];
-    if (data.total >= 10) {
-      let taiProb = data.Tai / data.total;
-      let prediction = taiProb > 0.5 ? 'Tài' : 'Xỉu';
-      let confidence = 55 + Math.abs(taiProb - 0.5) * 45;
-      return { pred: prediction, conf: Math.min(85, confidence), name: `HOUR_${hour}` };
-    }
-    return null;
-  }
-  
-  analyzeDaily() {
-    let day = new Date().getDay();
-    let data = this.dailyData[day];
-    if (data.total >= 8) {
-      let taiProb = data.Tai / data.total;
-      let prediction = taiProb > 0.5 ? 'Tài' : 'Xỉu';
-      let confidence = 50 + Math.abs(taiProb - 0.5) * 50;
-      return { pred: prediction, conf: Math.min(82, confidence), name: `DAY_${day}` };
-    }
-    return null;
-  }
-  
-  analyzeWeekly() {
-    let week = this.getWeekNumber();
-    let key = `W${week}`;
-    if (this.weeklyData.has(key)) {
-      let data = this.weeklyData.get(key);
-      if (data.total >= 20) {
-        let taiProb = data.Tai / data.total;
-        let prediction = taiProb > 0.5 ? 'Tài' : 'Xỉu';
-        let confidence = 50 + Math.abs(taiProb - 0.5) * 50;
-        return { pred: prediction, conf: Math.min(80, confidence), name: `WEEK_${week}` };
-      }
-    }
-    return null;
-  }
-  
-  analyzeMonthly() {
-    let month = new Date().getMonth();
-    let key = `M${month}`;
-    if (this.monthlyData.has(key)) {
-      let data = this.monthlyData.get(key);
-      if (data.total >= 50) {
-        let taiProb = data.Tai / data.total;
-        let prediction = taiProb > 0.5 ? 'Tài' : 'Xỉu';
-        let confidence = 50 + Math.abs(taiProb - 0.5) * 50;
-        return { pred: prediction, conf: Math.min(78, confidence), name: `MONTH_${month}` };
-      }
-    }
-    return null;
-  }
-  
-  analyzeQuarterly() {
-    let quarter = Math.floor(new Date().getMonth() / 3);
-    let key = `Q${quarter}`;
-    if (this.quarterlyData.has(key)) {
-      let data = this.quarterlyData.get(key);
-      if (data.total >= 100) {
-        let taiProb = data.Tai / data.total;
-        let prediction = taiProb > 0.5 ? 'Tài' : 'Xỉu';
-        let confidence = 50 + Math.abs(taiProb - 0.5) * 50;
-        return { pred: prediction, conf: Math.min(76, confidence), name: `QUARTER_${quarter}` };
-      }
-    }
-    return null;
-  }
-  
-  analyzeYearly() {
-    let year = new Date().getFullYear();
-    let key = `Y${year}`;
-    if (this.yearlyData.has(key)) {
-      let data = this.yearlyData.get(key);
-      if (data.total >= 200) {
-        let taiProb = data.Tai / data.total;
-        let prediction = taiProb > 0.5 ? 'Tài' : 'Xỉu';
-        let confidence = 50 + Math.abs(taiProb - 0.5) * 50;
-        return { pred: prediction, conf: Math.min(74, confidence), name: `YEAR_${year}` };
-      }
-    }
-    return null;
-  }
-  
-  updateHourly(actual) {
-    let hour = new Date().getHours();
-    if (actual === 'Tài') this.hourlyData[hour].Tai++;
-    else this.hourlyData[hour].Xiu++;
-    this.hourlyData[hour].total++;
-  }
-  
-  updateDaily(actual) {
-    let day = new Date().getDay();
-    if (actual === 'Tài') this.dailyData[day].Tai++;
-    else this.dailyData[day].Xiu++;
-    this.dailyData[day].total++;
-  }
-  
-  updateWeekly(actual) {
-    let week = this.getWeekNumber();
-    let key = `W${week}`;
-    if (!this.weeklyData.has(key)) {
-      this.weeklyData.set(key, { Tai: 0, Xiu: 0, total: 0 });
-    }
-    let data = this.weeklyData.get(key);
-    if (actual === 'Tài') data.Tai++;
-    else data.Xiu++;
-    data.total++;
-  }
-  
-  updateMonthly(actual) {
-    let month = new Date().getMonth();
-    let key = `M${month}`;
-    if (!this.monthlyData.has(key)) {
-      this.monthlyData.set(key, { Tai: 0, Xiu: 0, total: 0 });
-    }
-    let data = this.monthlyData.get(key);
-    if (actual === 'Tài') data.Tai++;
-    else data.Xiu++;
-    data.total++;
-  }
-  
-  updateQuarterly(actual) {
-    let quarter = Math.floor(new Date().getMonth() / 3);
-    let key = `Q${quarter}`;
-    if (!this.quarterlyData.has(key)) {
-      this.quarterlyData.set(key, { Tai: 0, Xiu: 0, total: 0 });
-    }
-    let data = this.quarterlyData.get(key);
-    if (actual === 'Tài') data.Tai++;
-    else data.Xiu++;
-    data.total++;
-  }
-  
-  updateYearly(actual) {
-    let year = new Date().getFullYear();
-    let key = `Y${year}`;
-    if (!this.yearlyData.has(key)) {
-      this.yearlyData.set(key, { Tai: 0, Xiu: 0, total: 0 });
-    }
-    let data = this.yearlyData.get(key);
-    if (actual === 'Tài') data.Tai++;
-    else data.Xiu++;
-    data.total++;
-  }
-  
-  getWeekNumber() {
-    let d = new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
-    let week1 = new Date(d.getFullYear(), 0, 4);
-    return 1 + Math.round(((d - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
-  }
-}
-
-// ===== CẤP ĐỘ 5: BỘ TỔNG HỢP THÔNG MINH =====
+// ===== BỘ TỔNG HỢP THÔNG MINH =====
 class SmartEnsemble {
   constructor() {
     this.baseDetector = new BasePatternDetector();
     this.advancedAnalyzer = new AdvancedAnalyzer();
-    this.smartLearner = new SmartLearner();
-    this.temporalAnalyzer = new TemporalAnalyzer();
+    this.history = [];
   }
   
   predict(results) {
@@ -794,41 +429,6 @@ class SmartEnsemble {
       if (pred) allPredictions.push(pred);
     }
     
-    // Smart learning
-    let learnerPred = this.smartLearner.predictFromPattern(results);
-    if (learnerPred) allPredictions.push(learnerPred);
-    
-    let seqPred = this.smartLearner.predictFromSequence(results);
-    if (seqPred) allPredictions.push(seqPred);
-    
-    let freqPred = this.smartLearner.predictFromFrequency(results);
-    if (freqPred) allPredictions.push(freqPred);
-    
-    let complexPred = this.smartLearner.predictComplexPattern(results);
-    if (complexPred) allPredictions.push(complexPred);
-    
-    let treePred = this.smartLearner.predictFromDecisionTree(results);
-    if (treePred) allPredictions.push(treePred);
-    
-    // Temporal
-    let hourPred = this.temporalAnalyzer.analyzeHourly();
-    if (hourPred) allPredictions.push(hourPred);
-    
-    let dayPred = this.temporalAnalyzer.analyzeDaily();
-    if (dayPred) allPredictions.push(dayPred);
-    
-    let weekPred = this.temporalAnalyzer.analyzeWeekly();
-    if (weekPred) allPredictions.push(weekPred);
-    
-    let monthPred = this.temporalAnalyzer.analyzeMonthly();
-    if (monthPred) allPredictions.push(monthPred);
-    
-    let quarterPred = this.temporalAnalyzer.analyzeQuarterly();
-    if (quarterPred) allPredictions.push(quarterPred);
-    
-    let yearPred = this.temporalAnalyzer.analyzeYearly();
-    if (yearPred) allPredictions.push(yearPred);
-    
     return this.finalFusion(allPredictions, results);
   }
   
@@ -838,39 +438,14 @@ class SmartEnsemble {
     }
     
     let taiScore = 0, xiuScore = 0;
-    let taiCount = 0, xiuCount = 0;
-    let weightedTai = 0, weightedXiu = 0;
-    
     for (let p of predictions) {
-      let weight = p.conf / 100;
-      if (p.pred === 'Tài') {
-        taiScore += p.conf;
-        taiCount++;
-        weightedTai += p.conf * weight;
-      } else {
-        xiuScore += p.conf;
-        xiuCount++;
-        weightedXiu += p.conf * weight;
-      }
+      if (p.pred === 'Tài') taiScore += p.conf;
+      else xiuScore += p.conf;
     }
-    
-    let finalConf = Math.max(taiScore, xiuScore) / (taiScore + xiuScore) * 100;
-    finalConf = Math.min(96, Math.max(60, Math.round(finalConf)));
     
     let finalPred = taiScore >= xiuScore ? 'Tài' : 'Xỉu';
-    
-    // Điều chỉnh nếu quá cân bằng
-    if (Math.abs(taiScore - xiuScore) < 50) {
-      // Dùng weighted để break tie
-      if (weightedTai > weightedXiu) finalPred = 'Tài';
-      else if (weightedXiu > weightedTai) finalPred = 'Xỉu';
-      else {
-        // Nếu vẫn hòa, dùng xu hướng gần nhất
-        let last = results[0] || 'Tài';
-        finalPred = last === 'Tài' ? 'Xỉu' : 'Tài';
-      }
-      finalConf = Math.max(65, finalConf - 5);
-    }
+    let finalConf = Math.max(taiScore, xiuScore) / (taiScore + xiuScore) * 100;
+    finalConf = Math.min(96, Math.max(60, Math.round(finalConf)));
     
     let topMethod = predictions.sort((a, b) => b.conf - a.conf)[0]?.name || 'ENSEMBLE';
     
@@ -882,185 +457,31 @@ class SmartEnsemble {
       totalAlgos: predictions.length
     };
   }
-  
-  learn(results, outcome, wasCorrect, method) {
-    this.temporalAnalyzer.updateHourly(outcome);
-    this.temporalAnalyzer.updateDaily(outcome);
-    this.temporalAnalyzer.updateWeekly(outcome);
-    this.temporalAnalyzer.updateMonthly(outcome);
-    this.temporalAnalyzer.updateQuarterly(outcome);
-    this.temporalAnalyzer.updateYearly(outcome);
-    
-    if (results && results.length >= 3) {
-      this.smartLearner.learnFromPattern(results, outcome, wasCorrect);
-      this.smartLearner.learnFromSequence(results, outcome);
-      this.smartLearner.learnFromFrequency(results, outcome);
-      this.smartLearner.learnComplexPattern(results, outcome);
-      this.smartLearner.learnDecisionTree(results, outcome);
-    }
-  }
 }
 
-// ===== BỘ DỰ ĐOÁN CHÍNH =====
-class UltimateMachine {
-  constructor() {
-    this.ensemble = new SmartEnsemble();
-    this.currentResults = [];
-    this.stats = { total: 0, correct: 0, streak: 0, history: [] };
-    this.currentData = null;
-  }
-  
-  predict(data) {
-    let results = [];
-    if (data && data.length > 0) {
-      for (let i = 0; i < Math.min(data.length, 35); i++) {
-        let v = data[i]?.Ket_qua || data[i]?.ket_qua || data[i];
-        if (v === 'Tài' || v === 'Xỉu') results.push(v);
-      }
-    }
-    
-    if (results.length < 5) {
-      return { 
-        prediction: 'Tài', 
-        confidence: 60, 
-        method: 'WAITING', 
-        totalAlgos: 0,
-        needMoreData: true,
-        dataCount: results.length
-      };
-    }
-    
-    this.currentResults = results;
-    let result = this.ensemble.predict(results);
-    return result;
-  }
-  
-  learn(prediction, actual, wasCorrect, method) {
-    this.stats.total++;
-    if (wasCorrect) {
-      this.stats.correct++;
-      this.stats.streak++;
-    } else {
-      this.stats.streak = 0;
-    }
-    
-    this.stats.history.unshift({ 
-      prediction, 
-      actual, 
-      wasCorrect, 
-      method,
-      time: Date.now() 
-    });
-    if (this.stats.history.length > 200) this.stats.history.pop();
-    
-    if (this.currentResults && this.currentResults.length >= 3) {
-      this.ensemble.learn(this.currentResults, actual, wasCorrect, method);
-    }
-  }
-  
-  getStats() {
-    let acc = this.stats.total > 0 ? (this.stats.correct / this.stats.total * 100) : 0;
-    let recent = this.stats.history.slice(0, 10).filter(h => h.wasCorrect).length;
-    let recentAcc = (recent / Math.min(10, this.stats.history.length) * 100);
-    
-    let last10 = this.stats.history.slice(0, 10);
-    let lastAcc = last10.filter(h => h.wasCorrect).length / Math.min(10, last10.length) * 100;
-    
-    let methods = {};
-    for (let h of this.stats.history) {
-      if (h.method) {
-        methods[h.method] = (methods[h.method] || 0) + 1;
-      }
-    }
-    
-    return {
-      total: this.stats.total,
-      correct: this.stats.correct,
-      accuracy: acc.toFixed(1) + '%',
-      recentAccuracy: recentAcc.toFixed(0) + '%',
-      last10Accuracy: lastAcc.toFixed(0) + '%',
-      streak: this.stats.streak,
-      methodsUsed: methods,
-      historyCount: this.stats.history.length
-    };
-  }
-  
-  getDetailedAnalysis() {
-    let history = this.stats.history.slice(0, 10);
-    let analysis = [];
-    for (let h of history) {
-      analysis.push({
-        time: new Date(h.time).toLocaleTimeString('vi-VN'),
-        prediction: h.prediction,
-        actual: h.actual,
-        result: h.wasCorrect ? '✅' : '❌',
-        method: h.method
-      });
-    }
-    return analysis;
-  }
-  
-  reset() {
-    this.stats = { total: 0, correct: 0, streak: 0, history: [] };
-    this.currentResults = [];
-    this.ensemble = new SmartEnsemble();
-  }
-}
-
-// ===== EXPORT CHÍNH =====
-const machine = new UltimateMachine();
-
-// ===== HÀM GỌI API VÀ XỬ LÝ =====
+// ================================================================
+// HÀM PHÂN TÍCH CHÍNH
+// ================================================================
 async function analyzeTaiXiu() {
-  const API_URL = "https://apisunwinhistory.onrender.com/api/tx";
-  const AUTHOR_ID = "@tranhoang2286";
-  
   try {
-    // Lấy dữ liệu từ API
     const response = await fetch(API_URL);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const data = await response.json();
     
-    // Kiểm tra dữ liệu
-    if (!data.phien || !data.ket_qua) {
-      throw new Error('Dữ liệu API không hợp lệ');
-    }
-    
-    // Chuyển đổi dữ liệu lịch sử (giả định có lịch sử từ API)
-    // Trong thực tế, bạn cần lưu lịch sử vào database hoặc local storage
-    let historyData = [];
-    if (data.lich_su && Array.isArray(data.lich_su)) {
-      historyData = data.lich_su;
-    } else {
-      // Nếu không có lịch sử, dùng dữ liệu hiện tại
-      historyData = [data];
-    }
-    
-    // Chuẩn bị dữ liệu cho thuật toán
-    let results = [];
-    for (let item of historyData) {
-      let result = item.ket_qua || item.Ket_qua;
-      if (result === 'Tài' || result === 'Xỉu') {
-        results.push(result);
-      }
-    }
-    
-    // Nếu chưa có lịch sử, dùng dữ liệu hiện tại
-    if (results.length === 0) {
-      results = [data.ket_qua];
-    }
+    // Tạo lịch sử từ dữ liệu hiện tại
+    const results = [data.ket_qua];
     
     // Dự đoán
-    const prediction = machine.predict(results);
+    const ensemble = new SmartEnsemble();
+    const prediction = ensemble.predict(results);
     
-    // Tạo kết quả JSON
-    const result = {
-      "Phiên": data.phien,
-      "xúc xắc 1": data.xuc_xac_1,
-      "xúc xắc 2": data.xuc_xac_2,
-      "xúc xắc 3": data.xuc_xac_3,
-      "tổng": data.tong,
-      "phiên dự đoán": data.phien + 1,
+    return {
+      "Phiên": data.phien || 0,
+      "xúc xắc 1": data.xuc_xac_1 || 0,
+      "xúc xắc 2": data.xuc_xac_2 || 0,
+      "xúc xắc 3": data.xuc_xac_3 || 0,
+      "tổng": data.tong || 0,
+      "phiên dự đoán": (data.phien || 0) + 1,
       "dự đoán": prediction.prediction || "Tài",
       "tỉ lệ": prediction.confidence + "%",
       "id": AUTHOR_ID,
@@ -1069,14 +490,9 @@ async function analyzeTaiXiu() {
         "phương pháp": prediction.method || "ENSEMBLE",
         "số thuật toán": prediction.totalAlgos || 0,
         "độ tin cậy": prediction.confidence || 60,
-        "xác suất": (prediction.probability || 50).toFixed(1) + "%",
-        "cần thêm dữ liệu": prediction.needMoreData || false,
-        "số mẫu": prediction.dataCount || results.length
-      },
-      "thống kê": machine.getStats()
+        "xác suất": (prediction.probability || 50).toFixed(1) + "%"
+      }
     };
-    
-    return result;
     
   } catch (error) {
     return {
@@ -1087,33 +503,40 @@ async function analyzeTaiXiu() {
   }
 }
 
-// ===== HÀM HỌC TỪ KẾT QUẢ THỰC TẾ =====
-function learnFromResult(prediction, actual) {
-  let wasCorrect = prediction === actual;
-  machine.learn(prediction, actual, wasCorrect, 'API');
-  return wasCorrect;
-}
+// ================================================================
+// TẠO WEB SERVER CHO RENDER
+// ================================================================
+const server = http.createServer(async (req, res) => {
+  // CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200);
+    res.end();
+    return;
+  }
+  
+  // Route: /api/tx
+  if (req.url === '/api/tx' || req.url === '/') {
+    try {
+      const result = await analyzeTaiXiu();
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(result, null, 2));
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: error.message }));
+    }
+  } else {
+    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ error: 'Not Found' }));
+  }
+});
 
-// ===== EXPORT =====
-export { 
-  analyzeTaiXiu, 
-  learnFromResult, 
-  machine,
-  UltimateMachine,
-  SmartEnsemble,
-  BasePatternDetector,
-  AdvancedAnalyzer,
-  SmartLearner,
-  TemporalAnalyzer
-};
-
-// ===== SỬ DỤNG TRONG BROWSER =====
-if (typeof window !== 'undefined') {
-  window.TaiXiuAnalyzer = {
-    analyzeTaiXiu,
-    learnFromResult,
-    machine,
-    UltimateMachine,
-    SmartEnsemble
-  };
-}
+// Start server
+server.listen(PORT, () => {
+  console.log(`✅ Server chạy tại http://localhost:${PORT}`);
+  console.log(`📊 API: http://localhost:${PORT}/api/tx`);
+  console.log(`👤 ID: ${AUTHOR_ID}`);
+});
